@@ -99,6 +99,9 @@ function renderPlan(){const c=BY[S.lastDest];if(!c){$("planBody").innerHTML='<di
   return `<div class="combo">🔗 <b>שילוב עם ${flag(n.iso)} ${n.c.he}</b> (~${n.h} ש' ב${MODE[n.mode]}): כדאי לבדוק "טיסה פתוחה" – הלוך ל־${to} וחזור מ־${na} (או הפוך), כדי לא לחזור על הדרך.
    <div class="links"><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/travel/flights?hl=iw&q=${encodeURIComponent(`One way flights from TLV to ${to}${P1.dep?" on "+P1.dep:""}${S.flight==="direct"?" nonstop":""}`)}">הלוך TLV←${to}</a><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/travel/flights?hl=iw&q=${encodeURIComponent(`One way flights from ${na} to TLV${P2.dep?" on "+P2.dep:""}${S.flight==="direct"?" nonstop":""}`)}">חזור ${na}←TLV</a><a class="alt" target="_blank" rel="noopener" href="https://www.skyscanner.co.il/transport/flights/tlv/${to.toLowerCase()}/?adultsv2=${P.pax}&rtn=0">Skyscanner כיוון אחד</a></div></div>`}).join("")}
  </article>
+ <article class="card" id="taCard"><h3>🦉 מהשטח – טריפאדווייזר</h3>
+ <label class="muted">עיר בסיס: <select id="taBase">${[...new Set((TRIPS[c.iso]||[]).map(t=>t[0]))].map(b=>`<option ${b===(P.base&&P.base[c.iso])?"selected":""}>${b}</option>`).join("")}</select></label>
+ <div id="taBody"><p class="muted">טוען אטרקציות…</p></div></article>
  <article class="card"><h3>🧭 טיולי יום מומלצים</h3><p class="muted">${tw?"מדורג לפי תחומי העניין שבחרת":"הגדר תחומי עניין בפרופיל לדירוג אישי"}. הנתונים כלליים – בדקו עונות, שעות ופתיחה לפני היציאה.</p>
  ${trips.map(({t})=>{const[base,name,desc,tm,tags]=t;const q=`${name} ${c.he}`;const qe=`${name} ${en}`;
   return `<div class="trip"><h4>${name}</h4><div class="muted">📍 מ${base} · ⏱️ ${tm}</div><p>${desc}</p>
@@ -106,7 +109,31 @@ function renderPlan(){const c=BY[S.lastDest];if(!c){$("planBody").innerHTML='<di
   <div class="links"><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name.split(" – ")[0]+", "+base+", "+c.he)}">🗺️ מפה</a><a class="alt" target="_blank" rel="noopener" href="https://www.getyourguide.com/s/?q=${encodeURIComponent(qe)}">GetYourGuide</a><a class="alt" target="_blank" rel="noopener" href="https://www.viator.com/searchResults/all?text=${encodeURIComponent(qe)}">Viator</a></div></div>`}).join("")}
  </article>`;
  const upd=()=>{P.ap=+$("pAp").value;P.dep=$("pDep").value;P.ret=$("pRet").value;P.month=+$("pMon").value;P.pax=Math.max(1,Math.min(9,+$("pPax").value||1));save();renderPlan()};
- ["pAp","pDep","pRet","pMon","pPax"].forEach(id=>$(id).onchange=upd)}
+ ["pAp","pDep","pRet","pMon","pPax"].forEach(id=>$(id).onchange=upd);
+ $("taBase").onchange=()=>{(P.base||(P.base={}))[c.iso]=$("taBase").value;save();loadTA(c,$("taBase").value)};loadTA(c,$("taBase").value)}
+// ---- live Tripadvisor via worker ----
+const TAKW={views:["viewpoint","observation","scenic","lookout","תצפית","נוף","mountain","הר"],trek:["hiking","trail","טיול","מסלול","שביל","national park"],day:["day trip","tour","סיור"],beach:["beach","חוף","bay","מפרץ","island","אי"],city:["neighborhood","old town","square","architect","רובע","עיר עתיקה","כיכר"],attr:["points of interest","landmark","amusement","theme park","אטרקציה","ציון דרך"],food:["food","market","winer","wine","culinary","שוק","אוכל","יקב"],nature:["nature","park","garden","zoo","waterfall","lake","cave","טבע","גן","מפל","אגם","מערה","גן חיות"],ski:["ski","סקי","cable car","רכבל"],adv:["outdoor","adventure","zipline","rafting","kayak","הרפתק","אתגר","ספורט"],shop:["shopping","mall","קניות","קניון"],night:["nightlife","bar","club","חיי לילה","בר"],hist:["histor","museum","castle","church","cathedral","ancient","ruins","monument","מוזיאון","טירה","כנסי","היסטור","עתיק","מבצר","ארמון"],road:["scenic drive","drive","road","כביש"],relax:["spa","thermal","bath","ספא","מרחצ","מעיינות"]};
+function taRank(items){return items.map(it=>{const hay=[it.name,it.category,it.description,...(it.subcategories||[]),...(it.groups||[])].join(" ").toLowerCase();
+  const m=INT.filter(([k])=>(S.w[k]||0)>0&&TAKW[k].some(w=>hay.includes(w.toLowerCase()))).map(([k])=>k);
+  const s=m.reduce((a,k)=>a+S.w[k],0)*10+(it.rating||0)*4+Math.log10(1+(it.num_reviews||0))*3;return{...it,m,s}}).sort((a,b)=>b.s-a.s)}
+let taHealth=null;
+async function taReady(){const cfg=window.TA_CONFIG||{};if(!cfg.workerUrl)return false;if(taHealth)return taHealth;
+ taHealth=(async()=>{const ac=new AbortController();const to=setTimeout(()=>ac.abort(),cfg.timeoutMs||8000);try{const r=await fetch(cfg.workerUrl.replace(/\/$/,"")+"/health",{signal:ac.signal});return r.ok&&!!(await r.json()).ta}catch{return false}finally{clearTimeout(to)}})();return taHealth}
+async function taFetch(q){const cfg=window.TA_CONFIG||{};if(!(await taReady()))throw new Error("off");
+ const ck="ta:"+q;try{const c=JSON.parse(localStorage.getItem("travelAdvisor.ta")||"{}")[ck];if(c&&Date.now()-c.t<(cfg.clientCacheDays||7)*864e5)return c.d}catch{}
+ const ac=new AbortController();const to=setTimeout(()=>ac.abort(),cfg.timeoutMs||8000);
+ try{const r=await fetch(cfg.workerUrl.replace(/\/$/,"")+"/ta/search?"+new URLSearchParams({q,category:"attractions",lang:cfg.lang||"iw"}),{signal:ac.signal});if(!r.ok)throw new Error("http "+r.status);const d=await r.json();
+  if(d.items?.length){try{const all=JSON.parse(localStorage.getItem("travelAdvisor.ta")||"{}");all[ck]={t:Date.now(),d};const ks=Object.keys(all);if(ks.length>40)delete all[ks[0]];localStorage.setItem("travelAdvisor.ta",JSON.stringify(all))}catch{}}return d}finally{clearTimeout(to)}}
+async function loadTA(c,base){const el=$("taBody");if(!el)return;const tok=(loadTA.tok=(loadTA.tok||0)+1);
+ let d=null;try{d=await taFetch(`${base} ${c.he}`);if(!d.items?.length){let en=c.he;try{en=EN.of(c.iso)}catch{}d=await taFetch(`${base}, ${en}`)}}catch(e){d=null}
+ if(tok!==loadTA.tok||!$("taBody"))return;
+ if(!d||!d.items?.length){el.innerHTML='<p class="note">ℹ️ התוכן החי מטריפאדווייזר אינו זמין כרגע – מוצגים טיולי היום שנבחרו מראש למטה.</p>';return}
+ const R=taRank(d.items);
+ el.innerHTML=`<div class="ta">${R.map(it=>`<div class="tai">${/^https:/.test(it.photo||"")?`<img src="${esc(it.photo)}" alt="" loading="lazy">`:""}<div class="b"><b>${esc(it.name)}</b>
+  <span>${it.rating?`<span class="stars">★ ${it.rating.toFixed(1)}</span> · `:""}${(it.num_reviews||0).toLocaleString("he-IL")} ביקורות</span>
+  ${it.category?`<span class="muted">${esc(it.category)}</span>`:""}${it.description?`<span class="muted">${esc(it.description.slice(0,140))}${it.description.length>140?"…":""}</span>`:""}
+  <div>${it.m.map(k=>`<span class="ichip m">${INTN[k]}</span>`).join("")}</div>
+  <a href="${/^https?:/.test(it.url)?esc(it.url):"#"}" target="_blank" rel="noopener">לעמוד בטריפאדווייזר ↗</a></div></div>`).join("")}</div><p class="muted">הנתונים באדיבות Tripadvisor${d.cached?" (מהמטמון)":""}.</p>`}
 function fmtM(c){return c.monthsTxt.split(",").map(r=>r.split("-").map(m=>MONTHS[m-1]).join("–")).join(", ")}
 // export/import/reset
 $("exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));a.download="travel-profile.json";a.click()};
@@ -132,7 +159,7 @@ function matchOne(raw){const fi=flagIso(raw);
 function parseList(txt){const parts=txt.split(/[\n\r;,\t]+/).map(x=>x.trim()).filter(x=>x&&!/^(country|countries|מדינה|מדינות|iso)$/i.test(x));const ok=new Map(),bad=[];
  parts.forEach(p=>{const i=matchOne(p);if(i)ok.set(i,(ok.get(i)||[]).concat(p));else bad.push(p)});return{ok,bad}}
 let PR=null;const OPTS='<option value="">— בחר מדינה ידנית / דלג —</option>'+[...C].sort((a,b)=>a.he.localeCompare(b.he,"he")).map(c=>`<option value="${c.iso}">${flag(c.iso)} ${c.he}</option>`).join("");
-const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function preview(){PR=parseList($("ptext").value);const ok=[...PR.ok.keys()];
  $("pprev").innerHTML=`<h4>זוהו ${ok.length} מדינות${ok.filter(i=>S.visited[i]).length?` (${ok.filter(i=>S.visited[i]).length} כבר מסומנות)`:""}</h4><div class="pm">${ok.map(i=>`<span>${flag(i)} ${BY[i].he}</span>`).join("")}</div>`+
  (PR.bad.length?`<h4>לא זוהו (${PR.bad.length})</h4>`+PR.bad.map((b,k)=>`<div class="um"><code>${esc(b)}</code><select data-k="${k}" aria-label="בחירה ידנית עבור ${esc(b)}">${OPTS}</select></div>`).join(""):"");
