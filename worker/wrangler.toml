@@ -1,8 +1,0 @@
-name = "travel-advisor-proxy"
-main = "worker.js"
-compatibility_date = "2025-09-01"
-workers_dev = true
-
-[[kv_namespaces]]
-binding = "CACHE"
-id = "289e695d9cf4415eb8eaa8b6d3006f1f"
