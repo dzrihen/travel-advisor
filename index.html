@@ -6,6 +6,7 @@
 <section id="profile" class="tab on">
  <h2>איפה כבר היית?</h2>
  <input id="q" type="search" placeholder="חיפוש מדינה..." aria-label="חיפוש מדינה">
+ <div class="row"><button id="pasteBtn" class="sec">📋 הדבקת רשימת מדינות</button><span id="saved" class="saved" aria-live="polite"></span></div>
  <div class="chips" id="regions"></div>
  <p class="muted"><span id="vcount">0</span> מדינות סומנו. לחיצה על ✎ מאפשרת לרשום ערים שבהן ביקרת.</p>
  <div id="countries" class="grid"></div>
@@ -35,4 +36,10 @@
 </main>
 <footer><button id="exp">ייצוא פרופיל</button><label class="btn">ייבוא<input id="imp" type="file" accept=".json" hidden></label><button id="reset">איפוס</button></footer>
 <dialog id="dlg"><form method="dialog"><h3 id="dlgT"></h3><label>ערים שביקרת (מופרדות בפסיק)<input id="dlgC"></label><menu><button value="ok" class="primary">שמירה</button></menu></form></dialog>
-<script src="data.js"></script><script src="app.js"></script></body></html>
+<dialog id="pdlg" class="wide"><h3>הדבקת רשימת מדינות</h3>
+<p class="muted">אפשר בעברית או באנגלית, קודי ISO, מופרד בשורות/פסיקים/נקודה-פסיק. מילים נוספות (למשל ערים אחרי מקף) יזוהו.</p>
+<textarea id="ptext" rows="7" placeholder="ארה&quot;ב&#10;- Italy – Rome, Florence&#10;3. תאילנד"></textarea>
+<div class="row"><label class="btn">📄 העלאת קובץ ‎.txt/.csv<input id="pfile" type="file" accept=".txt,.csv,text/plain,text/csv" hidden></label><button id="pparse" class="sec">זיהוי</button></div>
+<div id="pprev"></div>
+<menu class="row"><button id="papply" class="primary" disabled>סמן כביקרתי</button><button id="pclose" class="sec">סגירה</button></menu></dialog>
+<script src="aliases.js"></script><script src="data.js"></script><script src="app.js"></script></body></html>

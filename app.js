@@ -8,9 +8,12 @@ const C=RAW.map(r=>({iso:r[0],he:r[1],region:r[2],fh:r[3],direct:!!r[4],budget:r
 const BY=Object.fromEntries(C.map(c=>[c.iso,c]));
 const KEY="travelAdvisor.v1";
 const DEF={visited:{},w:{},flight:"any",maxh:8,days:10,month:0,budget:2,revisit:false,combo:true,comboH:4};
-let S=Object.assign({},DEF,JSON.parse(localStorage.getItem(KEY)||"{}"));
-const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 const $=id=>document.getElementById(id);
+let S;
+function load(){try{const o=JSON.parse(localStorage.getItem(KEY)||"{}");return o&&typeof o==="object"?o:{}}catch{return{}}}
+S=Object.assign({},DEF,load());if(!S.visited||typeof S.visited!=="object")S.visited={};if(!S.w||typeof S.w!=="object")S.w={};
+let st;const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));const e=$("saved");if(e){e.textContent="✓ נשמר";e.classList.add("show");clearTimeout(st);st=setTimeout(()=>e.classList.remove("show"),1200)}}catch(x){const e=$("saved");if(e){e.textContent="⚠️ השמירה נכשלה";e.classList.add("show")}}};
+window.addEventListener("pagehide",save);
 let region="הכל";
 // tabs
 function go(t){document.querySelectorAll(".tab").forEach(e=>e.classList.toggle("on",e.id===t));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));if(t==="recs")renderRecs();scrollTo(0,0)}
@@ -66,6 +69,38 @@ function fmtM(c){return c.monthsTxt.split(",").map(r=>r.split("-").map(m=>MONTHS
 $("exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));a.download="travel-profile.json";a.click()};
 $("imp").onchange=async e=>{try{S=Object.assign({},DEF,JSON.parse(await e.target.files[0].text()));save();init();alert("הפרופיל יובא")}catch{alert("קובץ לא תקין")}};
 $("reset").onclick=()=>{if(confirm("למחוק את כל הנתונים?")){S=JSON.parse(JSON.stringify(DEF));save();init()}};
+// ---- paste list ----
+const norm=s=>s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f\u0591-\u05C7]/g,"").replace(/[׳'`"”“״’]/g,"").replace(/[\u{1F1E6}-\u{1F1FF}]/gu,"").replace(/[^\p{L}\p{N} ]+/gu," ").replace(/\s+/g," ").trim();
+const EN=new Intl.DisplayNames(["en"],{type:"region"});
+const IDX=new Map();const addI=(k,i)=>{k=norm(k);if(k&&!IDX.has(k))IDX.set(k,i)};
+C.forEach(c=>{addI(c.he,c.iso);try{addI(EN.of(c.iso),c.iso)}catch{}});Object.entries(ALIASES).forEach(([k,i])=>i&&BY[i]&&addI(k,i));
+const HL=new Map();C.forEach(c=>{c.hl.forEach(h=>{const k=norm(h.replace(/\(.*\)/,""));if(k.length>3&&!IDX.has(k)&&!HL.has(k))HL.set(k,c.iso)})});
+function lev(a,b){const m=a.length,n=b.length;if(Math.abs(m-n)>2)return 9;let p=[...Array(n+1).keys()];for(let i=1;i<=m;i++){const q=[i];for(let j=1;j<=n;j++)q[j]=Math.min(p[j]+1,q[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=q}return p[n]}
+function flagIso(s){const m=[...s.matchAll(/[\u{1F1E6}-\u{1F1FF}]{2}/gu)][0];if(!m)return null;const i=[...m[0]].map(ch=>String.fromCharCode(ch.codePointAt(0)-127397)).join("");return BY[i]?i:null}
+function matchOne(raw){const fi=flagIso(raw);
+ let s=raw.replace(/^\s*(?:[-*•●▪◦·]|\d+[.)\]]|\(?\d+\))\s*/,"");
+ const head=s.split(/\s[-–—:|]\s|\s[–—]|[–—(]|\s-\s?/)[0];
+ for(const cand of [head,s]){const n=norm(cand);if(!n)continue;
+  if(/^[a-z]{2}$/.test(n)&&BY[n.toUpperCase()])return n.toUpperCase();
+  if(IDX.has(n))return IDX.get(n);if(HL.has(n))return HL.get(n);const nh=n.replace(/^ה(?=\S{3})/,"");if(IDX.has(nh))return IDX.get(nh);
+  const w=n.split(" ");for(let L=Math.min(4,w.length);L>=1;L--)for(let i=0;i+L<=w.length;i++){const k=w.slice(i,i+L).join(" ");if(k.length>=2&&IDX.has(k)&&!(k.length<=2&&L===1&&w.length>1))return IDX.get(k)}
+  if(n.length>=4){let best=null,bd=9;for(const[k,i]of IDX){const d=lev(n,k);if(d<bd){bd=d;best=i}}if(bd<=(n.length>=7?2:1))return best}}
+ return fi}
+function parseList(txt){const parts=txt.split(/[\n\r;,\t]+/).map(x=>x.trim()).filter(x=>x&&!/^(country|countries|מדינה|מדינות|iso)$/i.test(x));const ok=new Map(),bad=[];
+ parts.forEach(p=>{const i=matchOne(p);if(i)ok.set(i,(ok.get(i)||[]).concat(p));else bad.push(p)});return{ok,bad}}
+let PR=null;const OPTS='<option value="">— בחר מדינה ידנית / דלג —</option>'+[...C].sort((a,b)=>a.he.localeCompare(b.he,"he")).map(c=>`<option value="${c.iso}">${flag(c.iso)} ${c.he}</option>`).join("");
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function preview(){PR=parseList($("ptext").value);const ok=[...PR.ok.keys()];
+ $("pprev").innerHTML=`<h4>זוהו ${ok.length} מדינות${ok.filter(i=>S.visited[i]).length?` (${ok.filter(i=>S.visited[i]).length} כבר מסומנות)`:""}</h4><div class="pm">${ok.map(i=>`<span>${flag(i)} ${BY[i].he}</span>`).join("")}</div>`+
+ (PR.bad.length?`<h4>לא זוהו (${PR.bad.length})</h4>`+PR.bad.map((b,k)=>`<div class="um"><code>${esc(b)}</code><select data-k="${k}" aria-label="בחירה ידנית עבור ${esc(b)}">${OPTS}</select></div>`).join(""):"");
+ $("papply").disabled=!ok.length&&!PR.bad.length}
+$("pasteBtn").onclick=()=>{$("pprev").innerHTML="";$("papply").disabled=true;$("pdlg").showModal();$("ptext").focus()};
+$("pclose").onclick=()=>$("pdlg").close();
+$("pparse").onclick=preview;let pt;$("ptext").oninput=()=>{clearTimeout(pt);pt=setTimeout(preview,300)};
+$("pfile").onchange=async e=>{const f=e.target.files[0];if(!f)return;$("ptext").value=(await f.text()).replace(/^\uFEFF/,"");e.target.value="";preview()};
+$("papply").onclick=()=>{if(!PR)preview();const add=[...PR.ok.keys()];document.querySelectorAll("#pprev select").forEach(s=>s.value&&add.push(s.value));
+ let n=0;add.forEach(i=>{if(!S.visited[i]){S.visited[i]={cities:[]};n++}});save();renderCountries();$("pdlg").close();
+ const e=$("saved");e.textContent=`✓ נוספו ${n} מדינות ונשמר`;e.classList.add("show");clearTimeout(st);st=setTimeout(()=>e.classList.remove("show"),2500)};
 function init(){renderRegions();renderCountries();renderInts();syncForm()}
 init();
 })();
