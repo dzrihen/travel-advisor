@@ -16,7 +16,7 @@ let st;const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));const e=$
 window.addEventListener("pagehide",save);
 let region="הכל";
 // tabs
-function go(t){document.querySelectorAll(".tab").forEach(e=>e.classList.toggle("on",e.id===t));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));if(t==="recs")renderRecs();scrollTo(0,0)}
+function go(t){document.querySelectorAll(".tab").forEach(e=>e.classList.toggle("on",e.id===t));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));if(t==="recs")renderRecs();if(t==="plan")renderPlan();scrollTo(0,0)}
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>go(b.dataset.tab));
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 // countries
@@ -63,7 +63,50 @@ function renderRecs(){const R=C.map(score).filter(Boolean).sort((a,b)=>b.total-a
   ${r.why.length?`<p>✅ <b>למה זה מתאים:</b> ${r.why.join(", ")}</p>`:""}
   <div class="bars">${r.parts.map(p=>`<span class="bar">${p[0]}: ${p[1]>0?"+":""}${Math.round(p[1])}</span>`).join("")}</div>
   ${S.combo&&r.combos.length?`<div class="combo">🔗 <b>שילובים אפשריים:</b> ${r.combos.slice(0,4).map(n=>`${flag(n.iso)} ${n.c.he} (~${n.h} ש' ב${MODE[n.mode]}${n.v?", ביקרת":""})`).join(" · ")}</div>`:""}
-  </article>`}).join("")}
+  <button class="primary go" data-plan="${c.iso}">המשך לתכנון ←</button></article>`}).join("");
+ document.querySelectorAll("[data-plan]").forEach(b=>b.onclick=()=>openPlan(b.dataset.plan))}
+// ---- plan view ----
+const INTN=Object.fromEntries(INT);
+function openPlan(iso){S.lastDest=iso;save();go("plan");renderPlan()}
+$("back").onclick=()=>go("recs");
+const pad=n=>String(n).padStart(2,"0");
+function planDates(){const P=S.plan||(S.plan={pax:2,dep:"",ret:"",month:0});return P}
+function flightLinks(from,to,P,label){const direct=S.flight==="direct";
+ let q=`Flights from ${from} to ${to}`;if(P.dep)q+=` on ${P.dep}`;if(P.ret)q+=` through ${P.ret}`;else if(!P.dep&&P.month)q+=` in ${new Intl.DateTimeFormat("en",{month:"long"}).format(new Date(2026,P.month-1,1))}`;if(direct)q+=" nonstop";q+=` ${P.pax} ${P.pax>1?"adults":"adult"}`;
+ const g="https://www.google.com/travel/flights?hl=iw&q="+encodeURIComponent(q);
+ const ymd=d=>d?d.slice(2).replace(/-/g,""):"";let sk=`https://www.skyscanner.co.il/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/`;
+ if(P.dep){sk+=ymd(P.dep)+"/"+(P.ret?ymd(P.ret)+"/":"")}const sp=new URLSearchParams({adultsv2:P.pax,rtn:P.ret?1:0});if(direct)sp.set("preferdirects","true");if(!P.dep&&P.month){const y=P.month>=new Date().getMonth()+1?new Date().getFullYear():new Date().getFullYear()+1;sp.set("oym",String(y).slice(2)+pad(P.month))}sk+="?"+sp;
+ let kw=`https://www.kiwi.com/he/search/results/tel-aviv-israel/${to}/${P.dep||"anytime"}/${P.ret||(P.dep?"no-return":"anytime")}?adults=${P.pax}`;if(direct)kw+="&stopNumber=0%7Etrue";
+ return `<div class="links" aria-label="${label}"><a href="${g}" target="_blank" rel="noopener">Google Flights</a><a href="${sk}" target="_blank" rel="noopener" class="alt">Skyscanner</a><a href="${kw}" target="_blank" rel="noopener" class="alt">Kiwi</a></div>`}
+function renderPlan(){const c=BY[S.lastDest];if(!c){$("planBody").innerHTML='<div class="card">בחר יעד מתוך ההמלצות.</div>';return}
+ const P=planDates();const ap=AIRPORTS[c.iso]||[];const ai=Math.min(P.ap||0,ap.length-1);const to=ap[ai]||"";
+ const r=score(c)||{combos:c.nb.filter(n=>BY[n.iso]).map(n=>({...n,c:BY[n.iso],v:!!S.visited[n.iso]}))};
+ const tw=INT.reduce((a,[k])=>a+(S.w[k]||0),0);
+ const trips=(TRIPS[c.iso]||[]).map(t=>({t,s:t[4].reduce((a,k)=>a+(S.w[k]||0),0)})).sort((a,b)=>b.s-a.s);
+ const en=(()=>{try{return EN.of(c.iso)}catch{return c.he}})();
+ const combos=(r.combos||[]).slice(0,3);
+ $("planBody").innerHTML=`<article class="card"><h3>${flag(c.iso)} תכנון טיול ל${c.he}</h3>
+ <p>✈️ זמן טיסה משוער מנתב"ג: ~${c.fh} שעות · ${c.direct?"בדרך כלל יש טיסות ישירות מנתב\"ג":"בדרך כלל אין טיסה ישירה – צפו לקונקשן"} <small class="muted">(משוער)</small>${S.flight==="direct"?" · מסונן לטיסות ישירות":""}</p>
+ <div class="pform">
+  <label>שדה יעד<select id="pAp">${ap.map((a,i)=>`<option value="${i}" ${i===ai?"selected":""}>${a}</option>`).join("")}</select></label>
+  <label>יציאה<input type="date" id="pDep" value="${P.dep}"></label>
+  <label>חזרה<input type="date" id="pRet" value="${P.ret}"></label>
+  <label>או חודש (גמיש)<select id="pMon"><option value="0">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${P.month==i+1?"selected":""}>${m}</option>`).join("")}</select></label>
+  <label>נוסעים<input type="number" id="pPax" min="1" max="9" value="${P.pax}"></label>
+ </div>
+ <h4>חיפוש טיסות TLV ← ${to}</h4>${flightLinks("TLV",to,P,"טיסות")}
+ ${combos.map(n=>{const na=(AIRPORTS[n.iso]||[])[0];if(!na)return"";const P1={...P,ret:""},P2={...P,dep:P.ret||"",ret:""};
+  return `<div class="combo">🔗 <b>שילוב עם ${flag(n.iso)} ${n.c.he}</b> (~${n.h} ש' ב${MODE[n.mode]}): כדאי לבדוק "טיסה פתוחה" – הלוך ל־${to} וחזור מ־${na} (או הפוך), כדי לא לחזור על הדרך.
+   <div class="links"><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/travel/flights?hl=iw&q=${encodeURIComponent(`One way flights from TLV to ${to}${P1.dep?" on "+P1.dep:""}${S.flight==="direct"?" nonstop":""}`)}">הלוך TLV←${to}</a><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/travel/flights?hl=iw&q=${encodeURIComponent(`One way flights from ${na} to TLV${P2.dep?" on "+P2.dep:""}${S.flight==="direct"?" nonstop":""}`)}">חזור ${na}←TLV</a><a class="alt" target="_blank" rel="noopener" href="https://www.skyscanner.co.il/transport/flights/tlv/${to.toLowerCase()}/?adultsv2=${P.pax}&rtn=0">Skyscanner כיוון אחד</a></div></div>`}).join("")}
+ </article>
+ <article class="card"><h3>🧭 טיולי יום מומלצים</h3><p class="muted">${tw?"מדורג לפי תחומי העניין שבחרת":"הגדר תחומי עניין בפרופיל לדירוג אישי"}. הנתונים כלליים – בדקו עונות, שעות ופתיחה לפני היציאה.</p>
+ ${trips.map(({t})=>{const[base,name,desc,tm,tags]=t;const q=`${name} ${c.he}`;const qe=`${name} ${en}`;
+  return `<div class="trip"><h4>${name}</h4><div class="muted">📍 מ${base} · ⏱️ ${tm}</div><p>${desc}</p>
+  <div>${tags.map(k=>`<span class="ichip ${(S.w[k]||0)>=1?"m":""}">${INTN[k]}</span>`).join("")}</div>
+  <div class="links"><a class="alt" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name.split(" – ")[0]+", "+base+", "+c.he)}">🗺️ מפה</a><a class="alt" target="_blank" rel="noopener" href="https://www.getyourguide.com/s/?q=${encodeURIComponent(qe)}">GetYourGuide</a><a class="alt" target="_blank" rel="noopener" href="https://www.viator.com/searchResults/all?text=${encodeURIComponent(qe)}">Viator</a></div></div>`}).join("")}
+ </article>`;
+ const upd=()=>{P.ap=+$("pAp").value;P.dep=$("pDep").value;P.ret=$("pRet").value;P.month=+$("pMon").value;P.pax=Math.max(1,Math.min(9,+$("pPax").value||1));save();renderPlan()};
+ ["pAp","pDep","pRet","pMon","pPax"].forEach(id=>$(id).onchange=upd)}
 function fmtM(c){return c.monthsTxt.split(",").map(r=>r.split("-").map(m=>MONTHS[m-1]).join("–")).join(", ")}
 // export/import/reset
 $("exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));a.download="travel-profile.json";a.click()};
