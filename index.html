@@ -1,0 +1,38 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>יועץ היעדים של דניאל</title><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>"><link rel="stylesheet" href="style.css"></head><body>
+<header><h1>✈️ יועץ היעדים</h1><nav>
+<button data-tab="profile" class="on">1. הפרופיל שלי</button><button data-tab="trip">2. הטיול הבא</button><button data-tab="recs">3. המלצות</button></nav></header>
+<main>
+<section id="profile" class="tab on">
+ <h2>איפה כבר היית?</h2>
+ <input id="q" type="search" placeholder="חיפוש מדינה..." aria-label="חיפוש מדינה">
+ <div class="chips" id="regions"></div>
+ <p class="muted"><span id="vcount">0</span> מדינות סומנו. לחיצה על ✎ מאפשרת לרשום ערים שבהן ביקרת.</p>
+ <div id="countries" class="grid"></div>
+ <h2>מה אתה אוהב לעשות?</h2><p class="muted">חשיבות: 0 = לא מעניין, 3 = הכי חשוב</p>
+ <div id="interests" class="ints"></div>
+ <button class="primary" data-go="trip">המשך לטיול הבא ←</button>
+</section>
+<section id="trip" class="tab">
+ <h2>מה בא לך בטיול הבא?</h2>
+ <div class="form">
+  <label>טיסות<select id="flight"><option value="any">קונקשן אפשרי</option><option value="direct">ישירה בלבד</option></select></label>
+  <label>מקסימום שעות טיסה: <b id="maxhV"></b><input id="maxh" type="range" min="1" max="24" step="1"></label>
+  <label>אורך הטיול (ימים)<input id="days" type="number" min="2" max="60"></label>
+  <label>חודש נסיעה<select id="month"><option value="0">גמיש</option></select></label>
+  <label>תקציב<select id="budget"><option value="1">חסכוני</option><option value="2">בינוני</option><option value="3">גבוה / לא משנה</option></select></label>
+  <label class="chk"><input id="revisit" type="checkbox"> לאפשר מדינות שכבר הייתי בהן (ערים חדשות/שילובים)</label>
+  <label class="chk"><input id="combo" type="checkbox"> רוצה לשלב מדינה שכנה</label>
+  <label>עד כמה שעות נסיעה יבשתית לשכנה: <b id="comboHV"></b><input id="comboH" type="range" min="1" max="8" step="0.5"></label>
+ </div>
+ <button class="primary" data-go="recs">הצג המלצות ←</button>
+</section>
+<section id="recs" class="tab">
+ <h2>היעדים המומלצים לך</h2>
+ <p class="muted">⚠️ הנתונים משוערים (2025-2026): זמני טיסה, טיסות ישירות מנתב"ג ועונות. יש לבדוק מול חברות התעופה ואזהרות המל"ל לפני הזמנה.</p>
+ <div id="list"></div>
+</section>
+</main>
+<footer><button id="exp">ייצוא פרופיל</button><label class="btn">ייבוא<input id="imp" type="file" accept=".json" hidden></label><button id="reset">איפוס</button></footer>
+<dialog id="dlg"><form method="dialog"><h3 id="dlgT"></h3><label>ערים שביקרת (מופרדות בפסיק)<input id="dlgC"></label><menu><button value="ok" class="primary">שמירה</button></menu></form></dialog>
+<script src="data.js"></script><script src="app.js"></script></body></html>
